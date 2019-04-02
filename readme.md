@@ -4,10 +4,21 @@
 
 Under cover used LUA VM from [Yusuke Inuzuka](https://github.com/yuin/gopher-lua)
 
-## API
+> **Project in development!**
 
-Example
+
+
+Feel free to PR or contribute!
+
+Or/and Participate in the discussion in [issue](https://github.com/containous/traefik/issues/1336#issuecomment-478517290) on Traefik [github](https://github.com/containous/traefik) 
+
+
+
+## Usage example
+
 ```lua
+-- middleware_example.lua
+
 local http = require('http')
 local log = require('log')
 
@@ -30,9 +41,9 @@ It string with error message or `nil`, if no error
 
 
 
-## Installation
+## Installation from sources and run
 
-Download Traefik source
+Download Traefik source and go to directory
 
 ```bash
 git clone https://github.com/containous/traefik
@@ -42,10 +53,130 @@ cd traefik
 Add this repo as submodule
 
 ```bash
-git submodule add 
+git submodule add https://github.com/negasus/traefik2-luascript pkg/middlewares/luascript
 ```
 
+Add code for middleware config to file `pkg/config/middleware.go`
 
+```go
+type Middleware struct {
+  // ...
+  LuaScript         *LuaScript         `json:"lua,omitempty"`
+  // ...
+}
+
+// ...
+
+// +k8s:deepcopy-gen=true
+
+// LuaScript config
+type LuaScript struct {
+	Script string `json:"script,omitempty"`
+}
+```
+
+Add code for register middleware to `pkg/server/middleware/middlewares.go`
+
+```go
+import (
+  // ...
+	"github.com/containous/traefik/pkg/middlewares/luascript"  
+  // ...
+)
+
+// ...
+
+func (b *Builder) buildConstructor(ctx context.Context, middlewareName string, config config.Middleware) (alice.Constructor, error) {
+  // ...
+  
+  // BEGIN LUASCRIPT BLOCK
+	if config.LuaScript != nil {
+		if middleware == nil {
+			middleware = func(next http.Handler) (http.Handler, error) {
+				return luascript.New(ctx, next, *config.LuaScript, middlewareName)
+			}
+		} else {
+			return nil, badConf
+		}
+	}
+  // END LUASCRIPT BLOCK
+  
+  if middleware == nil {
+		return nil, fmt.Errorf("middleware %q does not exist", middlewareName)
+	}
+  // ...
+}
+```
+
+Build Traefik
+
+```bash
+go generate
+build -o ./traefik ./cmd/traefik
+```
+
+Create config file `config.toml`
+
+```toml
+[providers]
+   [providers.file]
+
+[http.routers]
+  [http.routers.router1]
+    Service = "service1"
+    Middlewares = ["example-luascript"]
+    Rule = "Host(`localhost`)"
+
+[http.middlewares]
+ [http.middlewares.example-luascript.LuaScript]
+    script = "example.lua"
+
+[http.services]
+ [http.services.service1]
+   [http.services.service1.LoadBalancer]
+
+     [[http.services.service1.LoadBalancer.Servers]]
+       URL = "https://api.github.com/users/octocat/orgs"
+       Weight = 1
+```
+
+Create lua script `example.lua`
+
+```lua
+local http = require('http')
+local log = require('log')
+
+log.warn('Hello from LUA script')
+http.setResponseHeader('X-New-Response-Header', 'Woohoo')
+```
+
+Run traefik
+
+```bash
+./traefik -c config.toml --log.loglevel=warn
+```
+
+Call traefik (from another terminal)
+
+```bash
+curl -v http://localhost
+```
+
+And as result we see traefik log
+
+```
+WARN[...] Hello from LUA script 	middlewareName=file.example-luascript middlewareType=LuaScript
+```
+
+and response from github API with our header
+
+```
+...
+< X-New-Response-Header: Woohoo
+...
+```
+
+Done!
 
 
 
@@ -134,13 +265,18 @@ Send message to traefik logger
 
 > debug(message string)
 
+```lua
+local log = require('log')
+
+log.error('an error occured')
+log.debug('header ' .. h .. ' not exist')
+```
+
 
 
 ## API Modules todo
 
 *This APIs planned to develop. The list can be changed.*
-
-*Feel free for PR or contribute*
 
 ### HTTP
 
@@ -176,95 +312,3 @@ Send message to traefik logger
 ### TRAEFIK
 
 - version() string
-
----
-	LuaScript         *LuaScript         `json:"lua,omitempty"`
-
-...
-
-// +k8s:deepcopy-gen=true
-
-// LuaScript config
-type LuaScript struct {
-	Script string `json:"script,omitempty"`
-}
-
-
-
----server
-import "github.com/containous/traefik/pkg/middlewares/luascript"
-
-	// LuaScript
-	if config.LuaScript != nil {
-		if middleware == nil {
-			middleware = func(next http.Handler) (http.Handler, error) {
-				return luascript.New(ctx, next, *config.LuaScript, middlewareName)
-			}
-		} else {
-			return nil, badConf
-		}
-	}
-
---- config.toml
-[providers]
-   [providers.file]
-
-[http.routers]
-  [http.routers.router1]
-    Service = "service1"
-    Middlewares = ["example-luascript"]
-    Rule = "Host(`localhost`)"
-
-[http.middlewares]
- [http.middlewares.example-luascript.LuaScript]
-    script = "example.lua"
-
-[http.services]
- [http.services.service1]
-   [http.services.service1.LoadBalancer]
-
-     [[http.services.service1.LoadBalancer.Servers]]
-       URL = "http://127.0.0.1:8080"
-       Weight = 1
-
--- demolua
--- get token from query argument 'token'
--- or from HTTP header 'Authorization' and check length
-
--- API for interaction with HTTP Request and Response
---local http = require("http")
--- API for send log messages
---local log = require("log")
-
---local tokenQueryArgument = 'token'
---local tokenHTTPHeader = 'Authorization'
---local tokenLength = 10
---
---log.debug("call 'token_validate.lua' script")
---
---local token, err
---
----- API methods returns error as last value
---token, err = http.getQueryArg(tokenQueryArgument)
---if err ~= nil or token == '' then
---    if err ~= nil then
---        log.warn('error get query argument ' .. tokenQueryArgument)
---    end
---
---    token = http.getRequestHeader(tokenHTTPHeader)
---end
---
---if token == nil or string.len(token) ~= tokenLength then
---    log.debug("bad token")
---    http.sendResponse(422, 'token validation error')
---    return
---end
-
--- for example, set request header, passed to backend
---http.setRequestHeader("X-Token-Validate", tokenLength)
---http.setResponseHeader("X-Token-Validate-Result", tokenLength)
-
-
-local http = require("http")
-http.setRequestHeader("X-Token-Validate", "42")
-http.setResponseHeader("X-Token-Validate-Result", "42")
