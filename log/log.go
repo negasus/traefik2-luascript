@@ -22,9 +22,9 @@ func (m *LuaModuleLog) Clean() {}
 func (m *LuaModuleLog) Loader(L *lua.LState) int {
 
 	var exports = map[string]lua.LGFunction{
-		"error": m.debug,
+		"error": m.error,
 		"warn":  m.warn,
-		"info":  m.debug,
+		"info":  m.info,
 		"debug": m.debug,
 	}
 
