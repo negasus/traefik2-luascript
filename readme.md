@@ -39,6 +39,124 @@ log.info('continue')
 Functions may return error as last variable.
 It string with error message or `nil`, if no error 
 
+## Benchmark
+
+> Configs and etc placed in folder benchmark of this repo
+
+Backend is simple go application
+
+```go
+package main
+
+import (
+	"log"
+	"net/http"
+)
+
+var ok = []byte("ok")
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(200)
+	w.Write(ok)
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+	log.Printf("listen 2000")
+	http.ListenAndServe("127.0.0.1:2000", nil)
+}
+```
+
+Run load testing with [vegeta](https://github.com/tsenart/vegeta)
+
+```bash
+echo "GET http://localhost/" | vegeta attack -rate 2000 -duration=60s | tee results.bin | vegeta report
+```
+
+**With LUA**
+
+Traefik config
+
+```toml
+[providers]
+   [providers.file]
+
+[http.routers]
+  [http.routers.router1]
+    Service = "service1"
+    Middlewares = ["middleware-luascript"]
+    Rule = "Host(`localhost`)"
+
+[http.middlewares]
+ [http.middlewares.middleware-luascript.LuaScript]
+    script = "middleware.lua"
+
+[http.services]
+ [http.services.service1]
+   [http.services.service1.LoadBalancer]
+
+     [[http.services.service1.LoadBalancer.Servers]]
+       URL = "http://127.0.0.1:2000"
+       Weight = 1
+```
+
+Lua script
+
+```lua
+local http = require('http')
+
+http.setResponseHeader('X-Header', 'Example')
+http.setRequestHeader('X-Header', 'Example')
+```
+
+Results
+
+```
+Requests      [total, rate]            120000, 2000.01
+Duration      [total, attack, wait]    59.999973743s, 59.999646s, 327.743µs
+Latencies     [mean, 50, 95, 99, max]  257.219µs, 240.406µs, 335.632µs, 583.415µs, 6.408465ms
+Bytes In      [total, mean]            240000, 2.00
+Bytes Out     [total, mean]            0, 0.00
+Success       [ratio]                  100.00%
+Status Codes  [code:count]             200:120000
+Error Set:
+```
+
+**Without LUA**
+
+Traefik config
+
+```toml
+[providers]
+   [providers.file]
+
+[http.routers]
+  [http.routers.router1]
+    Service = "service1"
+    Rule = "Host(`localhost`)"
+
+[http.services]
+ [http.services.service1]
+   [http.services.service1.LoadBalancer]
+
+     [[http.services.service1.LoadBalancer.Servers]]
+       URL = "http://127.0.0.1:2000"
+       Weight = 1
+```
+
+Results
+
+```
+Requests      [total, rate]            120000, 2000.01
+Duration      [total, attack, wait]    59.999894974s, 59.999696s, 198.974µs
+Latencies     [mean, 50, 95, 99, max]  242.899µs, 230.231µs, 315.612µs, 422.873µs, 6.254845ms
+Bytes In      [total, mean]            240000, 2.00
+Bytes Out     [total, mean]            0, 0.00
+Success       [ratio]                  100.00%
+Status Codes  [code:count]             200:120000
+Error Set:
+```
+
 
 
 ## Installation from sources and run
