@@ -258,6 +258,7 @@ http:
       loadBalancer:
         servers:
           - url: "https://api.github.com/users/octocat/orgs"```
+```
 
 Create lua script `example.lua`
 
