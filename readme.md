@@ -4,15 +4,7 @@
 
 Under cover used LUA VM from [Yusuke Inuzuka](https://github.com/yuin/gopher-lua)
 
-> **Project in development!**
-
-
-
-Feel free to PR or contribute!
-
-Or/and Participate in the discussion in [issue](https://github.com/containous/traefik/issues/1336#issuecomment-478517290) on Traefik [github](https://github.com/containous/traefik) 
-
-
+An [issue](https://github.com/containous/traefik/issues/1336#issuecomment-478517290)  
 
 ## Usage example
 
@@ -174,7 +166,7 @@ Add this repo as submodule
 git submodule add https://github.com/negasus/traefik2-luascript pkg/middlewares/luascript
 ```
 
-Add code for middleware config to file `pkg/config/middleware.go`
+Add code for middleware config to file `pkg/config/dynamic/middleware.go`
 
 ```go
 type Middleware struct {
@@ -198,7 +190,7 @@ Add code for register middleware to `pkg/server/middleware/middlewares.go`
 ```go
 import (
   // ...
-	"github.com/containous/traefik/pkg/middlewares/luascript"  
+	"github.com/containous/traefik/v2/pkg/middlewares/luascript"  
   // ...
 )
 
@@ -219,10 +211,11 @@ func (b *Builder) buildConstructor(ctx context.Context, middlewareName string, c
 	}
   // END LUASCRIPT BLOCK
   
-  if middleware == nil {
-		return nil, fmt.Errorf("middleware %q does not exist", middlewareName)
+	if middleware == nil {
+		return nil, fmt.Errorf("invalid middleware %q configuration: invalid middleware type or middleware does not exist", middlewareName)
 	}
-  // ...
+
+	return tracing.Wrap(ctx, middleware), nil
 }
 ```
 
@@ -230,33 +223,41 @@ Build Traefik
 
 ```bash
 go generate
-build -o ./traefik ./cmd/traefik
+go build -o ./traefik ./cmd/traefik
 ```
 
-Create config file `config.toml`
+Create config file `config.yml`
 
-```toml
-[providers]
-   [providers.file]
+```yml
+log:
+  level: warn
 
-[http.routers]
-  [http.routers.router1]
-    Service = "service1"
-    Middlewares = ["example-luascript"]
-    Rule = "Host(`localhost`)"
-
-[http.middlewares]
- [http.middlewares.example-luascript.LuaScript]
-    script = "example.lua"
-
-[http.services]
- [http.services.service1]
-   [http.services.service1.LoadBalancer]
-
-     [[http.services.service1.LoadBalancer.Servers]]
-       URL = "https://api.github.com/users/octocat/orgs"
-       Weight = 1
+providers:
+  file:
+    filename: "/path/to/providers.yml"
 ```
+
+and `providers.yml`
+
+```yml
+http:
+  routers:
+    router1:
+      rule: "Host(`localhost`)"
+      service: service1
+      middlewares:
+        - example
+
+  middlewares:
+    example:
+      luascript:
+        script: /path/to/example.lua
+
+  services:
+    service1:
+      loadBalancer:
+        servers:
+          - url: "https://api.github.com/users/octocat/orgs"```
 
 Create lua script `example.lua`
 
@@ -268,25 +269,25 @@ log.warn('Hello from LUA script')
 http.setResponseHeader('X-New-Response-Header', 'Woohoo')
 ```
 
-Run traefik
+Run the traefik
 
 ```bash
-./traefik -c config.toml --log.loglevel=warn
+./traefik --configFile config.yml
 ```
 
-Call traefik (from another terminal)
+Call the traefik (from another terminal)
 
 ```bash
 curl -v http://localhost
 ```
 
-And as result we see traefik log
+And as result we see a traefik log
 
 ```
 WARN[...] Hello from LUA script 	middlewareName=file.example-luascript middlewareType=LuaScript
 ```
 
-and response from github API with our header
+and a response from the github API with our header
 
 ```
 ...
@@ -295,7 +296,6 @@ and response from github API with our header
 ```
 
 Done!
-
 
 
 ## API
@@ -389,44 +389,3 @@ local log = require('log')
 log.error('an error occured')
 log.debug('header ' .. h .. ' not exist')
 ```
-
-
-
-## API Modules todo
-
-*This APIs planned to develop. The list can be changed.*
-
-### HTTP
-
-- getRemoteAddr() value string, error
-- getURI() value string, error
-- getHost() value string, error
-- getPort() value string, error
-- getPath() value string, error
-- getSchema() value string, error
-- getQuery() value string, error
-
-
-
-### CACHE (global state)
-
-- put(key, value string, [ttl int]) error
-- get(key string) value string, error
-- delete(key string) error
-- has(key string) result bool, error
-- inc(key string) value int, error
-- dec(key string) value int, error
-
-
-
-### METRICS
-
-- counterAdd(name string, value float, [labels... string]) error
-- gaugeAdd(name string, value float, [labels... string]) error
-- gaugeSet(name string, value float, [labels... string]) error
-
-
-
-### TRAEFIK
-
-- version() string

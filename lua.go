@@ -4,7 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/containous/traefik/pkg/tracing"
+	"github.com/containous/traefik/v2/pkg/log"
+	"github.com/containous/traefik/v2/pkg/tracing"
 	"github.com/opentracing/opentracing-go/ext"
 	"net/http"
 	"os"
@@ -12,8 +13,8 @@ import (
 	"github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
 
-	"github.com/containous/traefik/pkg/config"
-	"github.com/containous/traefik/pkg/middlewares"
+	config "github.com/containous/traefik/v2/pkg/config/dynamic"
+	"github.com/containous/traefik/v2/pkg/middlewares"
 )
 
 const (
@@ -29,7 +30,7 @@ type luaScript struct {
 
 // New creates a new handler.
 func New(ctx context.Context, next http.Handler, config config.LuaScript, name string) (http.Handler, error) {
-	logger := middlewares.GetLogger(ctx, name, typeName)
+	logger := log.FromContext(middlewares.GetLoggerCtx(ctx, name, typeName))
 	logger.Debug("Creating middleware")
 
 	var result *luaScript
@@ -53,7 +54,7 @@ func (l *luaScript) GetTracingInformation() (string, ext.SpanKindEnum) {
 }
 
 func (l *luaScript) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	logger := middlewares.GetLogger(req.Context(), l.name, typeName)
+	logger := log.FromContext(middlewares.GetLoggerCtx(req.Context(), l.name, typeName))
 
 	luaState := getState(logger)
 	defer putState(luaState)

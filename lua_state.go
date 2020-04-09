@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"sync"
 
-	moduleHTTP "github.com/containous/traefik/pkg/middlewares/luascript/http"
-	moduleLog "github.com/containous/traefik/pkg/middlewares/luascript/log"
+	moduleHTTP "github.com/containous/traefik/v2/pkg/middlewares/luascript/http"
+	moduleLog "github.com/containous/traefik/v2/pkg/middlewares/luascript/log"
 	"github.com/sirupsen/logrus"
 	"github.com/yuin/gopher-lua"
 )
