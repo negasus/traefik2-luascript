@@ -453,8 +453,11 @@ Send a request
 **get, post, put, delete**
 
 > get('url', [<OPTIONS>]) **response**[, **error** string]
+
 > post('url', [<OPTIONS>]) **response**[, **error** string]
+
 > put('url', [<OPTIONS>]) **response**[, **error** string]
+
 > delete('url', [<OPTIONS>]) **response**[, **error** string]
 
 Aliases for `request`
