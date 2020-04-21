@@ -3,6 +3,7 @@ package http
 import (
 	"fmt"
 	lua "github.com/yuin/gopher-lua"
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 var (
 	requestArgsPool = sync.Pool{}
+	defaultTimeout  = time.Millisecond * 250
 )
 
 type requestArgs struct {
@@ -36,13 +38,14 @@ func releaseRequestArgs(a *requestArgs) {
 
 func newRequestArgs() *requestArgs {
 	return &requestArgs{
+		Method:  http.MethodGet,
 		Headers: make(map[string]string),
 		Timeout: defaultTimeout,
 	}
 }
 
 func (a *requestArgs) reset() {
-	a.Method = ""
+	a.Method = http.MethodGet
 	a.URL = ""
 	a.Body = a.Body[:0]
 	for key := range a.Headers {
