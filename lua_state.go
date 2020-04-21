@@ -6,6 +6,7 @@ import (
 
 	moduleHTTP "github.com/containous/traefik/v2/pkg/middlewares/luascript/http"
 	moduleLog "github.com/containous/traefik/v2/pkg/middlewares/luascript/log"
+	moduleTraefik "github.com/containous/traefik/v2/pkg/middlewares/luascript/traefik"
 	"github.com/sirupsen/logrus"
 	"github.com/yuin/gopher-lua"
 )
@@ -13,46 +14,42 @@ import (
 var luaStatePool sync.Pool
 
 type luaState struct {
-	L          *lua.LState
-	moduleLog  *moduleLog.LuaModuleLog
-	moduleHTTP *moduleHTTP.LuaModuleHTTP
+	L             *lua.LState
+	moduleLog     *moduleLog.LuaModuleLog
+	moduleTraefik *moduleTraefik.LuaModuleTraefik
+	moduleHTTP    *moduleHTTP.LuaModuleHTTP
 }
 
-func (ls *luaState) PassHTTPData(rw http.ResponseWriter, req *http.Request) {
-	ls.moduleHTTP.SetHTTPData(rw, req)
-}
-
-func newLuaState() *luaState {
-	l := &luaState{
-		L: lua.NewState(),
-	}
-	// Required l.L.Close() ?
-	// lua.State.Close() will removes temp files
-	// Its safe not call function?
-	return l
-}
-
-// get luaState from pool
 func getState(logger logrus.FieldLogger) *luaState {
 	state := luaStatePool.Get()
-	if state != nil {
-		return state.(*luaState)
+	if state == nil {
+
+		state = &luaState{
+			moduleLog:     moduleLog.New(logger),
+			moduleTraefik: moduleTraefik.New(logger),
+			moduleHTTP:    moduleHTTP.New(logger),
+		}
 	}
 
-	s := newLuaState()
-
-	s.moduleLog = moduleLog.New(logger)
-	s.L.PreloadModule("log", s.moduleLog.Loader)
-
-	s.moduleHTTP = moduleHTTP.New(logger)
-	s.L.PreloadModule("http", s.moduleHTTP.Loader)
-
-	return s
+	return state.(*luaState)
 }
 
-// clean all modules and return luaState to pool
-func putState(state *luaState) {
+func releaseLuaState(state *luaState) {
 	state.moduleLog.Clean()
+	state.moduleTraefik.Clean()
 	state.moduleHTTP.Clean()
+	state.L.Close()
+	state.L = nil
 	luaStatePool.Put(state)
+}
+
+func acquireLuaState(rw http.ResponseWriter, req *http.Request, logger logrus.FieldLogger) *luaState {
+	state := getState(logger)
+	state.L = lua.NewState()
+
+	state.L.PreloadModule("log", state.moduleLog.Loader())
+	state.L.PreloadModule("traefik", state.moduleTraefik.Loader(rw, req))
+	state.L.PreloadModule("http", state.moduleHTTP.Loader())
+
+	return state
 }

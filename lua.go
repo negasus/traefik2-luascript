@@ -33,20 +33,21 @@ func New(ctx context.Context, next http.Handler, config config.LuaScript, name s
 	logger := log.FromContext(middlewares.GetLoggerCtx(ctx, name, typeName))
 	logger.Debug("Creating middleware")
 
-	var result *luaScript
+	var m *luaScript
 
 	lfunc, err := compileLua(config.Script)
 	if err != nil {
 		return nil, fmt.Errorf("error compile lua script '%s': %v", config.Script, err)
 	}
 
-	result = &luaScript{
-		next:  next,
-		name:  name,
+	m = &luaScript{
+		next: next,
+		name: name,
+
 		lfunc: lfunc,
 	}
 
-	return result, nil
+	return m, nil
 }
 
 func (l *luaScript) GetTracingInformation() (string, ext.SpanKindEnum) {
@@ -56,23 +57,14 @@ func (l *luaScript) GetTracingInformation() (string, ext.SpanKindEnum) {
 func (l *luaScript) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	logger := log.FromContext(middlewares.GetLoggerCtx(req.Context(), l.name, typeName))
 
-	luaState := getState(logger)
-	defer putState(luaState)
-
-	luaState.PassHTTPData(rw, req)
+	luaState := acquireLuaState(rw, req, logger)
+	defer releaseLuaState(luaState)
 
 	if err := doCompiledFile(luaState.L, l.lfunc); err != nil {
 		logger.Warnf("error run compiled lua script", "error", err)
 	}
 
-	// if HTTP Module stopped the request by call 'http.sendResponse' from lua script
-	if stopped, code, message := luaState.moduleHTTP.IsStop(); stopped {
-		rw.WriteHeader(code)
-		if len(message) > 0 {
-			if _, err := rw.Write(message); err != nil {
-				logger.Warnf("error write response: %v", err)
-			}
-		}
+	if luaState.moduleTraefik.WasInterrupted() {
 		return
 	}
 

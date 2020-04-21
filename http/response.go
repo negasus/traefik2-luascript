@@ -1,29 +1,32 @@
 package http
 
 import (
-	"github.com/yuin/gopher-lua"
+	lua "github.com/yuin/gopher-lua"
 )
 
-func (m *LuaModuleHTTP) setResponseHeader(L *lua.LState) int {
-	if m.rw == nil {
-		return 0
-	}
-
-	key := L.ToString(1)
-	value := L.ToString(2)
-
-	if key == "" {
-		return 0
-	}
-
-	m.rw.Header().Add(key, value)
-
-	return 0
+type response struct {
+	StatusCode int
+	Body       []byte
+	Headers    map[string]string
 }
 
-func (m *LuaModuleHTTP) sendResponse(L *lua.LState) int {
-	m.statusCode = L.ToInt(1)
-	m.responseMessage = []byte(L.ToString(2))
-	m.stopRequest = true
-	return 0
+func newResponse() *response {
+	return &response{
+		Headers: make(map[string]string),
+	}
+}
+
+func (r *response) toLuaTable() *lua.LTable {
+	t := &lua.LTable{}
+	t.RawSet(lua.LString("status"), lua.LNumber(r.StatusCode))
+	t.RawSet(lua.LString("body"), lua.LString(r.Body))
+
+	h := &lua.LTable{}
+	for name, value := range r.Headers {
+		h.RawSet(lua.LString(name), lua.LString(value))
+	}
+
+	t.RawSet(lua.LString("headers"), h)
+
+	return t
 }

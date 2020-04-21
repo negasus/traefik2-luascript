@@ -8,53 +8,33 @@ import (
 
 func New(logger logrus.FieldLogger) *LuaModuleHTTP {
 	m := &LuaModuleHTTP{
-		responseMessage: make([]byte, 0),
-		logger:          logger,
+		logger: logger,
+		client: &http.Client{},
 	}
 
 	return m
 }
 
 type LuaModuleHTTP struct {
-	req             *http.Request
-	rw              http.ResponseWriter
-	stopRequest     bool
-	statusCode      int
-	responseMessage []byte
-	logger          logrus.FieldLogger
+	logger logrus.FieldLogger
+	client *http.Client
 }
 
-func (m *LuaModuleHTTP) IsStop() (bool, int, []byte) {
-	return m.stopRequest, m.statusCode, m.responseMessage
-}
+func (h *LuaModuleHTTP) Loader() lua.LGFunction {
+	return func(L *lua.LState) int {
+		var exports = map[string]lua.LGFunction{
+			"request": h.request,
+			"post":    h.send(http.MethodPost),
+			"get":     h.send(http.MethodGet),
+			"put":     h.send(http.MethodPut),
+			"delete":  h.send(http.MethodDelete),
+		}
 
-func (m *LuaModuleHTTP) Clean() {
-	m.req = nil
-	m.rw = nil
-	m.stopRequest = false
-	m.statusCode = 0
-	m.responseMessage = m.responseMessage[:0]
-}
+		mod := L.SetFuncs(L.NewTable(), exports)
 
-func (m *LuaModuleHTTP) SetHTTPData(rw http.ResponseWriter, req *http.Request) {
-	m.rw = rw
-	m.req = req
-}
-
-func (m *LuaModuleHTTP) Loader(L *lua.LState) int {
-
-	var exports = map[string]lua.LGFunction{
-		"setResponseHeader": m.setResponseHeader,
-		"sendResponse":      m.sendResponse,
-
-		"getRequestHeader": m.getRequestHeader,
-		"setRequestHeader": m.setRequestHeader,
-
-		"getQueryArg": m.getQueryArg,
+		L.Push(mod)
+		return 1
 	}
-
-	mod := L.SetFuncs(L.NewTable(), exports)
-
-	L.Push(mod)
-	return 1
 }
+
+func (h *LuaModuleHTTP) Clean() {}

@@ -19,19 +19,21 @@ type LuaModuleLog struct {
 
 func (m *LuaModuleLog) Clean() {}
 
-func (m *LuaModuleLog) Loader(L *lua.LState) int {
+func (m *LuaModuleLog) Loader() lua.LGFunction {
+	return func(L *lua.LState) int {
 
-	var exports = map[string]lua.LGFunction{
-		"error": m.error,
-		"warn":  m.warn,
-		"info":  m.info,
-		"debug": m.debug,
+		var exports = map[string]lua.LGFunction{
+			"error": m.error,
+			"warn":  m.warn,
+			"info":  m.info,
+			"debug": m.debug,
+		}
+
+		mod := L.SetFuncs(L.NewTable(), exports)
+
+		L.Push(mod)
+		return 1
 	}
-
-	mod := L.SetFuncs(L.NewTable(), exports)
-
-	L.Push(mod)
-	return 1
 }
 
 func (m *LuaModuleLog) error(L *lua.LState) int {
