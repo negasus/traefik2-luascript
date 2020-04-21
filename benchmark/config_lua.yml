@@ -1,20 +1,18 @@
-[providers]
-   [providers.file]
+http:
+  routers:
+    router1:
+      rule: "Host(`localhost`)"
+      service: service1
+      middlewares:
+        - example
 
-[http.routers]
-  [http.routers.router1]
-    Service = "service1"
-    Middlewares = ["middleware-luascript"]
-    Rule = "Host(`localhost`)"
+  middlewares:
+    example:
+      luascript:
+        script: middleware.lua
 
-[http.middlewares]
- [http.middlewares.middleware-luascript.LuaScript]
-    script = "middleware.lua"
-
-[http.services]
- [http.services.service1]
-   [http.services.service1.LoadBalancer]
-
-     [[http.services.service1.LoadBalancer.Servers]]
-       URL = "http://127.0.0.1:2000"
-       Weight = 1
+  services:
+    service1:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:2000"

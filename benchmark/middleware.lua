@@ -1,4 +1,4 @@
-local http = require('http')
+local traefik = require('traefik')
 
-http.setResponseHeader('X-Header', 'Example')
-http.setRequestHeader('X-Header', 'Example')
+traefik.setRequestHeader('X-Header', 'Example')
+traefik.addResponseHeader('X-Header', 'Example')

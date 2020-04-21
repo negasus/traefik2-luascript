@@ -6,36 +6,51 @@ Under cover used LUA VM from [Yusuke Inuzuka](https://github.com/yuin/gopher-lua
 
 An [issue](https://github.com/containous/traefik/issues/1336#issuecomment-478517290)  
 
+Post on [the community portal](https://community.containo.us/t/custom-middleware-for-traefik2-lua-script/5463) 
+
+## About
+
+This middleware allows you to write your business logic in LUA script
+
+- get an incoming request
+- add/modify request headers
+- add/modify response headers
+- interrupt the request
+- make HTTP calls to foreign services
+- write to traefik log
+ 
 ## Usage example
 
 ```lua
 -- middleware_example.lua
 
-local http = require('http')
+local traefik = require('traefik')
 local log = require('log')
 
-local h, err = http.getRequestHeader('X-Some-Header')
+local h, err = traefik.getRequestHeader('X-Some-Header')
 if err ~= nil then
   log.warn('error get header ' .. err)
   return
 end
 
 if h == '' then
-    http.sendResponse(401, 'HTTP Header empty or not exists')
+    traefik.interrupt(401, 'HTTP Header empty or not exists')
     return
 end
+
+traefik.setRequestHeader('Authorized', 'SUCCESS')
 
 log.info('continue')
 ```
 
-Functions may return error as last variable.
-It string with error message or `nil`, if no error 
+Functions may return an error as a last variable.
+It is a string with an error message or `nil`, if no error 
 
 ## Benchmark
 
-> Configs and etc placed in folder benchmark of this repo
+> See into `benchmark` folder in this repo
 
-Backend is simple go application
+Backend is a simple go application
 
 ```go
 package main
@@ -67,85 +82,79 @@ echo "GET http://localhost/" | vegeta attack -rate 2000 -duration=60s | tee resu
 
 **With LUA**
 
-Traefik config
+A Traefik config
 
-```toml
-[providers]
-   [providers.file]
+```yaml
+http:
+  routers:
+    router1:
+      rule: "Host(`localhost`)"
+      service: service1
+      middlewares:
+        - example
 
-[http.routers]
-  [http.routers.router1]
-    Service = "service1"
-    Middlewares = ["middleware-luascript"]
-    Rule = "Host(`localhost`)"
+  middlewares:
+    example:
+      luascript:
+        script: middleware.lua
 
-[http.middlewares]
- [http.middlewares.middleware-luascript.LuaScript]
-    script = "middleware.lua"
-
-[http.services]
- [http.services.service1]
-   [http.services.service1.LoadBalancer]
-
-     [[http.services.service1.LoadBalancer.Servers]]
-       URL = "http://127.0.0.1:2000"
-       Weight = 1
+  services:
+    service1:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:2000"
 ```
 
-Lua script
+A Lua script
 
 ```lua
-local http = require('http')
+local traefik = require('traefik')
 
-http.setResponseHeader('X-Header', 'Example')
-http.setRequestHeader('X-Header', 'Example')
+traefik.setRequestHeader('X-Header', 'Example')
+traefik.setResponseHeader('X-Header', 'Example')
 ```
 
-Results
+A Result
 
 ```
-Requests      [total, rate]            120000, 2000.01
-Duration      [total, attack, wait]    59.999973743s, 59.999646s, 327.743µs
-Latencies     [mean, 50, 95, 99, max]  257.219µs, 240.406µs, 335.632µs, 583.415µs, 6.408465ms
-Bytes In      [total, mean]            240000, 2.00
-Bytes Out     [total, mean]            0, 0.00
-Success       [ratio]                  100.00%
-Status Codes  [code:count]             200:120000
+Requests      [total, rate, throughput]  120000, 2000.02, 2000.00
+Duration      [total, attack, wait]      59.999868062s, 59.999484357s, 383.705µs
+Latencies     [mean, 50, 95, 99, max]    471.058µs, 365.053µs, 993.75µs, 1.26782ms, 18.771475ms
+Bytes In      [total, mean]              240000, 2.00
+Bytes Out     [total, mean]              0, 0.00
+Success       [ratio]                    100.00%
+Status Codes  [code:count]               200:120000
 Error Set:
 ```
 
 **Without LUA**
 
-Traefik config
+A Traefik config
 
-```toml
-[providers]
-   [providers.file]
+```yaml
+http:
+  routers:
+    router1:
+      rule: "Host(`localhost`)"
+      service: service1
 
-[http.routers]
-  [http.routers.router1]
-    Service = "service1"
-    Rule = "Host(`localhost`)"
-
-[http.services]
- [http.services.service1]
-   [http.services.service1.LoadBalancer]
-
-     [[http.services.service1.LoadBalancer.Servers]]
-       URL = "http://127.0.0.1:2000"
-       Weight = 1
+  services:
+    service1:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:2000"
 ```
 
-Results
+A Result
 
 ```
-Requests      [total, rate]            120000, 2000.01
-Duration      [total, attack, wait]    59.999894974s, 59.999696s, 198.974µs
-Latencies     [mean, 50, 95, 99, max]  242.899µs, 230.231µs, 315.612µs, 422.873µs, 6.254845ms
-Bytes In      [total, mean]            240000, 2.00
-Bytes Out     [total, mean]            0, 0.00
-Success       [ratio]                  100.00%
-Status Codes  [code:count]             200:120000
+Requests      [total, rate, throughput]  120000, 2000.02, 2000.01
+Duration      [total, attack, wait]      59.999708481s, 59.999466875s, 241.606µs
+Latencies     [mean, 50, 95, 99, max]    257.527µs, 227.055µs, 339.606µs, 520.189µs, 28.70824ms
+Bytes In      [total, mean]              240000, 2.00
+Bytes Out     [total, mean]              0, 0.00
+Success       [ratio]                    100.00%
+Status Codes  [code:count]               200:120000
 Error Set:
 ```
 
@@ -153,25 +162,25 @@ Error Set:
 
 ## Installation from sources and run
 
-Download Traefik source and go to directory
+Download the Traefik sources and go to the directory
 
 ```bash
 git clone https://github.com/containous/traefik
 cd traefik
 ```
 
-Add this repo as submodule
+Add this repo as a submodule
 
 ```bash
 git submodule add https://github.com/negasus/traefik2-luascript pkg/middlewares/luascript
 ```
 
-Add code for middleware config to file `pkg/config/dynamic/middleware.go`
+Add the code for the middleware config to the file `pkg/config/dynamic/middleware.go`
 
 ```go
 type Middleware struct {
   // ...
-  LuaScript         *LuaScript         `json:"lua,omitempty"`
+	LuaScript         *LuaScript         `json:"luascript,omitempty" toml:"luascript,omitempty" yaml:"luascript,omitempty"`
   // ...
 }
 
@@ -181,11 +190,11 @@ type Middleware struct {
 
 // LuaScript config
 type LuaScript struct {
-	Script string `json:"script,omitempty"`
+	Script string `json:"script,omitempty" toml:"script,omitempty" yaml:"script,omitempty"`
 }
 ```
 
-Add code for register middleware to `pkg/server/middleware/middlewares.go`
+Add the code for register a middleware to the file `pkg/server/middleware/middlewares.go`
 
 ```go
 import (
@@ -219,14 +228,14 @@ func (b *Builder) buildConstructor(ctx context.Context, middlewareName string, c
 }
 ```
 
-Build Traefik
+Build the Traefik
 
 ```bash
 go generate
 go build -o ./traefik ./cmd/traefik
 ```
 
-Create config file `config.yml`
+Create a config file `config.yml`
 
 ```yml
 log:
@@ -257,23 +266,23 @@ http:
     service1:
       loadBalancer:
         servers:
-          - url: "https://api.github.com/users/octocat/orgs"```
+          - url: "https://api.github.com/users/octocat/orgs"
 ```
 
-Create lua script `example.lua`
+Create a lua script `example.lua`
 
 ```lua
-local http = require('http')
+local traefik = require('traefik')
 local log = require('log')
 
 log.warn('Hello from LUA script')
-http.setResponseHeader('X-New-Response-Header', 'Woohoo')
+traefik.setResponseHeader('X-New-Response-Header', 'Woohoo')
 ```
 
 Run the traefik
 
 ```bash
-./traefik --configFile config.yml
+./traefik --configFile=config.yml
 ```
 
 Call the traefik (from another terminal)
@@ -282,13 +291,13 @@ Call the traefik (from another terminal)
 curl -v http://localhost
 ```
 
-And as result we see a traefik log
+And, as result, we see a traefik log
 
 ```
 WARN[...] Hello from LUA script 	middlewareName=file.example-luascript middlewareType=LuaScript
 ```
 
-and a response from the github API with our header
+A response from the github API with our header
 
 ```
 ...
@@ -298,68 +307,67 @@ and a response from the github API with our header
 
 Done!
 
-
 ## API
 
-### HTTP
+### Traefik
 
-**Get HTTP Request header**
+`Traefik` module allows get information about current request. Add request/response headers, or interrupt the request.
+
+Usage:
+
+```lua
+traefik = require('traefik')
+```
+
+**Get Request Header**
 
 > getRequestHeader(**name** string) **value** string, **error**
 
 If header not exists, returns no error and empty string value!
 
 ```lua 
-local http = require('http')
+local traefik = require('traefik')
 local log = require('log')
 
-local h, err = http.getRequestHeader('X-Authorization')
+local h, err = traefik.getRequestHeader('X-Authorization')
 if err ~= nil then
   log.debug('error get header' .. err)
 end
 ```
 
-
-
-**Set HTTP Request Header**
+**Set Request Header**
 
 > setRequestHeader(**name** string, **value** string) **error**
 
 Set header for pass to backend
 
 ```lua 
-err = http.setRequestHeader('X-Authorization', 'SomeSecretToken')
+err = traefik.setRequestHeader('X-Authorization', 'SomeSecretToken')
 ```
 
-
-
-**Stop request and return response with status code and message**
-
-> sendResponse(**code** int, [**message** string]) **error**
-
-Call `sendResponse` stop request processing and return specified response to client
-
-```lua 
-err = http.sendResponse(403)
--- or
-err = http.sendResponse(422, 'Validation Error')
-```
-
-
-
-**Set HTTP Response Header**
+**Set Response Header**
 
 > setResponseHeader(**name** string, **value** string) **error**
 
 Set header for return to client
 
 ```lua 
-err = http.setResponseHeader('X-Authorization', 'SomeSecretToken')
+err = traefik.setResponseHeader('X-Authorization', 'SomeSecretToken')
 ```
 
+** Interrupt the request and return StatusCode and  Body
 
+> interrupt(**code** int, [**message** string]) **error**
 
-**Get HTTP Request Query Argument**
+```lua 
+err = traefik.interrupt(403)
+
+-- or
+
+err = traefik.interrupt(422, 'Validation Error')
+```
+
+**Get Request Query Argument**
 
 > getQueryArg(**name** string) **value** string, **error**
 
@@ -367,14 +375,34 @@ Get value from query args
 
 ```lua 
 -- Get 'foo' for URL http://example.com/?token=foo
-v, err = http.getQueryArg('token')
+v, err = traefik.getQueryArg('token')
 ```
 
+**Get Request**
 
+> getRequest() **value** table
+
+Get request info
+
+```lua 
+info = traefik.getRequest()
+
+{
+    method = 'GET',
+    uri = '...',
+    host = '...',
+    remoteAddr = '...',
+    referer = '...',
+    headers = {
+        key = 'value',
+        ...
+    }
+}
+```
 
 ### LOG
 
-Send message to traefik logger
+Send a message to a traefik logger
 
 > error(message string)
 
@@ -390,3 +418,43 @@ local log = require('log')
 log.error('an error occured')
 log.debug('header ' .. h .. ' not exist')
 ```
+
+### HTTP
+
+Set HTTP requests to remote services
+
+Usage: 
+
+```lua
+http = request('http')
+```
+
+**request**
+
+> request(**<OPTIONS>** table) **response**[, **error** string]
+
+Send a request
+
+**OPTIONS** is a table with request options
+
+```
+{
+    method = 'POST',    -- http method. By default: GET
+    url     = '',       -- URL
+    body    = '',       -- request body. By default: empty
+    timeout = 100,      -- timeout in milliseconds. By default: 250 (ms)
+    headers = {         -- request heders
+        key = 'value',
+        ...
+    }
+}
+```
+
+**get, post, put, delete**
+
+> get('url', [<OPTIONS>]) **response**[, **error** string]
+> post('url', [<OPTIONS>]) **response**[, **error** string]
+> put('url', [<OPTIONS>]) **response**[, **error** string]
+> delete('url', [<OPTIONS>]) **response**[, **error** string]
+
+Aliases for `request`

@@ -1,15 +1,11 @@
-[providers]
-   [providers.file]
+http:
+  routers:
+    router1:
+      rule: "Host(`localhost`)"
+      service: service1
 
-[http.routers]
-  [http.routers.router1]
-    Service = "service1"
-    Rule = "Host(`localhost`)"
-
-[http.services]
- [http.services.service1]
-   [http.services.service1.LoadBalancer]
-
-     [[http.services.service1.LoadBalancer.Servers]]
-       URL = "http://127.0.0.1:2000"
-       Weight = 1
+  services:
+    service1:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:2000"
