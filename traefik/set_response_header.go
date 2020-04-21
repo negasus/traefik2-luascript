@@ -4,14 +4,14 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-// Add response header
+// Set response header
 //
-// traefik.addResponseHeader(<NAME>, <VALUE>) [error]
+// traefik.setResponseHeader(<NAME>, <VALUE>) [error]
 // <NAME> 	string
 // <VALUE> 	string
 //
 // error	nil|string
-func (m *LuaModuleTraefik) addResponseHeader(L *lua.LState) int {
+func (m *LuaModuleTraefik) setResponseHeader(L *lua.LState) int {
 	name := L.Get(1)
 	value := L.Get(2)
 
@@ -25,7 +25,7 @@ func (m *LuaModuleTraefik) addResponseHeader(L *lua.LState) int {
 		return 1
 	}
 
-	m.rw.Header().Add(name.String(), value.String())
+	m.rw.Header().Set(name.String(), value.String())
 
 	return 0
 }

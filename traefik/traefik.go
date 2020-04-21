@@ -49,7 +49,7 @@ func (m *LuaModuleTraefik) Loader(rw http.ResponseWriter, req *http.Request) lua
 	m.req = req
 	return func(L *lua.LState) int {
 		var exports = map[string]lua.LGFunction{
-			"addResponseHeader": m.addResponseHeader,
+			"setResponseHeader": m.setResponseHeader,
 			"interrupt":         m.interrupt,
 			"setRequestHeader":  m.setRequestHeader,
 			"getRequestHeader":  m.getRequestHeader,
