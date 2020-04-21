@@ -450,6 +450,19 @@ Send a request
 }
 ```
 
+**RESPONSE**
+
+```
+{
+    status  = 200,      -- response status code
+    body    = '',       -- response body
+    headers = {         -- response headers
+        key = value,
+        ...
+    }
+}
+```
+
 **get, post, put, delete**
 
 > get('url', [<OPTIONS>]) **response**[, **error** string]
