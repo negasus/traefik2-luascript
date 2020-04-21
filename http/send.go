@@ -13,7 +13,7 @@ func (h *LuaModuleHTTP) send(method string) lua.LGFunction {
 			L.Push(lua.LString("first argument must be a string"))
 			return 2
 		}
-		uriLuaT := uriLua.(*lua.LString)
+		uriLuaT := uriLua.(lua.LString)
 
 		args := acquireRequestArgs()
 		defer releaseRequestArgs(args)
