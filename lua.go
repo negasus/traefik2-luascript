@@ -4,17 +4,18 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/containous/traefik/v2/pkg/log"
-	"github.com/containous/traefik/v2/pkg/tracing"
+	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	"github.com/traefik/traefik/v2/pkg/log"
+	"github.com/traefik/traefik/v2/pkg/tracing"
 	"net/http"
 	"os"
 
 	"github.com/yuin/gopher-lua"
 	"github.com/yuin/gopher-lua/parse"
 
-	config "github.com/containous/traefik/v2/pkg/config/dynamic"
-	"github.com/containous/traefik/v2/pkg/middlewares"
+	config "github.com/traefik/traefik/v2/pkg/config/dynamic"
+	"github.com/traefik/traefik/v2/pkg/middlewares"
 )
 
 const (
@@ -57,11 +58,17 @@ func (l *luaScript) GetTracingInformation() (string, ext.SpanKindEnum) {
 func (l *luaScript) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	logger := log.FromContext(middlewares.GetLoggerCtx(req.Context(), l.name, typeName))
 
+	ctx := req.Context()
+	span := opentracing.SpanFromContext(ctx)
+
 	luaState := acquireLuaState(rw, req, logger)
 	defer releaseLuaState(luaState)
 
 	if err := doCompiledFile(luaState.L, l.lfunc); err != nil {
-		logger.Warnf("error run compiled lua script", "error", err)
+		logger.Errorf("error run compiled lua script", "error", err)
+		span.SetTag("error", "true")
+		span.LogKV("message", "error run compiled lua script: " + err.Error())
+		return
 	}
 
 	if luaState.moduleTraefik.WasInterrupted() {

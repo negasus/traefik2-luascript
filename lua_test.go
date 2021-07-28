@@ -2,7 +2,7 @@ package luascript
 
 import (
 	"context"
-	traefikConfig "github.com/containous/traefik/pkg/config"
+	traefikConfig "github.com/traefik/traefik/v2/pkg/config/dynamic"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"

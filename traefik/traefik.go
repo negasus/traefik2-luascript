@@ -55,6 +55,8 @@ func (m *LuaModuleTraefik) Loader(rw http.ResponseWriter, req *http.Request) lua
 			"getRequestHeader":  m.getRequestHeader,
 			"getQueryArg":       m.getQueryArg,
 			"getRequest":        m.getRequest,
+			"setRequestBody":	 m.setRequestBody,
+			"getRequestBody":	 m.getRequestBody,
 		}
 
 		mod := L.SetFuncs(L.NewTable(), exports)
