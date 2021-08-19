@@ -531,5 +531,5 @@ Encodes a value into a JSON string. Returns nil and an error string if the value
 local json = require('json')
 t = {}
 t[1] = "first" 
-str, err = json.decode(t)
+str, err = json.encode(t)
 ```
