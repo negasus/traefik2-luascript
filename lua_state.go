@@ -1,13 +1,14 @@
 package luascript
 
 import (
+	moduleJson "layeh.com/gopher-json"
 	"net/http"
 	"sync"
 
-	moduleHTTP "github.com/containous/traefik/v2/pkg/middlewares/luascript/http"
-	moduleLog "github.com/containous/traefik/v2/pkg/middlewares/luascript/log"
-	moduleTraefik "github.com/containous/traefik/v2/pkg/middlewares/luascript/traefik"
 	"github.com/sirupsen/logrus"
+	moduleHTTP "github.com/traefik/traefik/v2/pkg/middlewares/luascript/http"
+	moduleLog "github.com/traefik/traefik/v2/pkg/middlewares/luascript/log"
+	moduleTraefik "github.com/traefik/traefik/v2/pkg/middlewares/luascript/traefik"
 	"github.com/yuin/gopher-lua"
 )
 
@@ -46,10 +47,11 @@ func releaseLuaState(state *luaState) {
 func acquireLuaState(rw http.ResponseWriter, req *http.Request, logger logrus.FieldLogger) *luaState {
 	state := getState(logger)
 	state.L = lua.NewState()
+	moduleJson.Preload(state.L)
 
 	state.L.PreloadModule("log", state.moduleLog.Loader())
 	state.L.PreloadModule("traefik", state.moduleTraefik.Loader(rw, req))
-	state.L.PreloadModule("http", state.moduleHTTP.Loader())
+	state.L.PreloadModule("http", state.moduleHTTP.Loader(req.Context()))
 
 	return state
 }

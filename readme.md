@@ -13,11 +13,13 @@ Post on [the community portal](https://community.containo.us/t/custom-middleware
 This middleware allows you to write your business logic in LUA script
 
 - get an incoming request
+- get/set request body
 - add/modify request headers
 - add/modify response headers
 - interrupt the request
 - make HTTP calls to foreign services
 - write to traefik log
+- encode/decode json
  
 ## Usage example
 
@@ -165,14 +167,14 @@ Error Set:
 Download the Traefik sources and go to the directory
 
 ```bash
-git clone https://github.com/containous/traefik
+git clone https://github.com/traefik/traefik
 cd traefik
 ```
 
 Add this repo as a submodule
 
 ```bash
-git submodule add https://github.com/negasus/traefik2-luascript pkg/middlewares/luascript
+git submodule add https://github.com/valebedeva/traefik2-luascript pkg/middlewares/luascript
 ```
 
 Add the code for the middleware config to the file `pkg/config/dynamic/middleware.go`
@@ -345,6 +347,27 @@ Set header for pass to backend
 err = traefik.setRequestHeader('X-Authorization', 'SomeSecretToken')
 ```
 
+**Get Request Body**
+
+> getRequestBody() **value** string, **error**
+
+```lua 
+local body, err = traefik.getRequestBody()
+if err ~= nil then
+  log.debug('error get body ' .. err)
+end
+```
+
+**Set Request Body**
+
+> setRequestBody(**value** string) **error**
+
+Set body for pass to backend
+
+```lua 
+err = traefik.setRequestBody('{"foo": "bar"}')
+```
+
 **Set Response Header**
 
 > setResponseHeader(**name** string, **value** string) **error**
@@ -474,3 +497,39 @@ Send a request
 > delete('url', [OPTIONS]) **response**[, **error** string]
 
 Aliases for `request` with predefined Method and URL
+
+### JSON
+
+**Decode**
+
+Decodes a JSON string. Returns nil and an error string if the string could not be decoded
+
+> decode(**str** string) **value** value, **error**
+
+The following types are supported:
+
+ Lua      | JSON     
+ -------- | -------- 
+  table   | object: when table is non-empty and has only string keys; array:  when table is empty, or has only sequential numeric keys starting from 1 
+  string  | string
+  number  | number
+  nil     | null
+
+
+```lua 
+local json = require('json')
+value, err = json.decode('{"foo": "bar"}')
+```
+
+**Encode**
+
+Encodes a value into a JSON string. Returns nil and an error string if the value could not be encoded
+
+> encode(**value** value) **str** string, **error**
+
+```lua 
+local json = require('json')
+t = {}
+t[1] = "first" 
+str, err = json.encode(t)
+```

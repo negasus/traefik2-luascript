@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"github.com/sirupsen/logrus"
 	"github.com/yuin/gopher-lua"
 	"net/http"
@@ -18,9 +19,11 @@ func New(logger logrus.FieldLogger) *LuaModuleHTTP {
 type LuaModuleHTTP struct {
 	logger logrus.FieldLogger
 	client *http.Client
+	ctx context.Context
 }
 
-func (h *LuaModuleHTTP) Loader() lua.LGFunction {
+func (h *LuaModuleHTTP) Loader(ctx context.Context) lua.LGFunction {
+	h.ctx = ctx
 	return func(L *lua.LState) int {
 		var exports = map[string]lua.LGFunction{
 			"request": h.request,

@@ -11,7 +11,7 @@ import (
 
 var (
 	requestArgsPool = sync.Pool{}
-	defaultTimeout  = time.Millisecond * 250
+	defaultTimeout  = time.Second * 1
 )
 
 type requestArgs struct {

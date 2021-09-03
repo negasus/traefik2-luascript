@@ -1,11 +1,13 @@
 package http
 
 import (
+	"github.com/opentracing/opentracing-go"
 	lua "github.com/yuin/gopher-lua"
 )
 
 func (h *LuaModuleHTTP) send(method string) lua.LGFunction {
 	return func(L *lua.LState) int {
+		span := opentracing.SpanFromContext(h.ctx)
 
 		uriLua := L.Get(1)
 		if uriLua.Type() != lua.LTString {
@@ -23,6 +25,8 @@ func (h *LuaModuleHTTP) send(method string) lua.LGFunction {
 			if argsLua.Type() != lua.LTTable {
 				L.Push(lua.LNil)
 				L.Push(lua.LString("second argument must be a table"))
+				span.SetTag("error", true)
+				span.LogKV("message", "second argument must be a table")
 				return 2
 			}
 			argsLuaT := argsLua.(*lua.LTable)
@@ -30,6 +34,8 @@ func (h *LuaModuleHTTP) send(method string) lua.LGFunction {
 			if err != nil {
 				L.Push(lua.LNil)
 				L.Push(lua.LString("error parse arguments: " + err.Error()))
+				span.SetTag("error", true)
+				span.LogKV("message", "error parse arguments: " + err.Error())
 				return 2
 			}
 		}
@@ -42,6 +48,8 @@ func (h *LuaModuleHTTP) send(method string) lua.LGFunction {
 		if err != nil {
 			L.Push(lua.LNil)
 			L.Push(lua.LString("error send request: " + err.Error()))
+			span.SetTag("error", true)
+			span.LogKV("message", "error send request: " + err.Error())
 			return 2
 		}
 
@@ -52,10 +60,14 @@ func (h *LuaModuleHTTP) send(method string) lua.LGFunction {
 }
 
 func (h *LuaModuleHTTP) request(L *lua.LState) int {
+	span := opentracing.SpanFromContext(h.ctx)
+
 	argsLua := L.Get(1)
 	if argsLua.Type() != lua.LTTable {
 		L.Push(lua.LNil)
 		L.Push(lua.LString("argument must be a table"))
+		span.SetTag("error", true)
+		span.LogKV("message", "argument must be a table")
 		return 2
 	}
 	argsLuaT := argsLua.(*lua.LTable)
@@ -67,6 +79,8 @@ func (h *LuaModuleHTTP) request(L *lua.LState) int {
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString("error parse arguments: " + err.Error()))
+		span.SetTag("error", true)
+		span.LogKV("message", "error parse arguments: " + err.Error())
 		return 2
 	}
 
@@ -74,6 +88,8 @@ func (h *LuaModuleHTTP) request(L *lua.LState) int {
 	if err != nil {
 		L.Push(lua.LNil)
 		L.Push(lua.LString("error send request: " + err.Error()))
+		span.SetTag("error", true)
+		span.LogKV("message", "error send request: " + err.Error())
 		return 2
 	}
 

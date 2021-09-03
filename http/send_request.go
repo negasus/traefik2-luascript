@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
@@ -26,11 +27,25 @@ func (h *LuaModuleHTTP) sendRequest(args *requestArgs) (*response, error) {
 		req.Header.Set(name, value)
 	}
 
+	span, _ := opentracing.StartSpanFromContext(h.ctx, "/")
+	defer span.Finish()
+	span.SetTag("http.method", args.Method)
+	span.SetTag("span.kind", "client")
+	err = opentracing.GlobalTracer().Inject(
+		span.Context(),
+		opentracing.HTTPHeaders,
+		opentracing.HTTPHeadersCarrier(req.Header))
+	if err != nil {
+		return nil, fmt.Errorf("inject: %s", err.Error())
+	}
+
 	resp, err := h.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error send request, %w", err)
 	}
 	defer resp.Body.Close()
+
+	span.SetTag("http.status_code", resp.StatusCode)
 
 	res := newResponse()
 
