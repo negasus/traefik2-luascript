@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/opentracing/opentracing-go"
 	"go.uber.org/zap"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -51,7 +51,7 @@ func (h *LuaModuleHTTP) sendRequest(args *requestArgs) (*response, error) {
 
 	res.StatusCode = resp.StatusCode
 
-	res.Body, err = ioutil.ReadAll(resp.Body)
+	res.Body, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error read body, %w", err)
 	}

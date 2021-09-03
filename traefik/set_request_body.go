@@ -3,7 +3,7 @@ package traefik
 import (
 	"bytes"
 	lua "github.com/yuin/gopher-lua"
-	"io/ioutil"
+	"io"
 )
 
 func (m *LuaModuleTraefik) setRequestBody(L *lua.LState) int {
@@ -14,7 +14,7 @@ func (m *LuaModuleTraefik) setRequestBody(L *lua.LState) int {
 		return 1
 	}
 
-	m.req.Body = ioutil.NopCloser(bytes.NewBuffer([]byte(body.String())))
+	m.req.Body = io.NopCloser(bytes.NewBuffer([]byte(body.String())))
 	m.req.ContentLength = int64(len(body.String()))
 
 	return 0
