@@ -174,7 +174,7 @@ cd traefik
 Add this repo as a submodule
 
 ```bash
-git submodule add https://github.com/valebedeva/traefik2-luascript pkg/middlewares/luascript
+git submodule add https://github.com/negasus/traefik2-luascript pkg/middlewares/luascript
 ```
 
 Add the code for the middleware config to the file `pkg/config/dynamic/middleware.go`
@@ -201,7 +201,7 @@ Add the code for register a middleware to the file `pkg/server/middleware/middle
 ```go
 import (
   // ...
-	"github.com/containous/traefik/v2/pkg/middlewares/luascript"  
+	"github.com/traefik/traefik/v2/pkg/middlewares/luascript"  
   // ...
 )
 
@@ -233,8 +233,7 @@ func (b *Builder) buildConstructor(ctx context.Context, middlewareName string, c
 Build the Traefik
 
 ```bash
-go generate
-go build -o ./traefik ./cmd/traefik
+make build
 ```
 
 Create a config file `config.yml`
@@ -243,9 +242,13 @@ Create a config file `config.yml`
 log:
   level: warn
 
+entryPoints:
+  web:
+    address: ":8080"
+
 providers:
   file:
-    filename: "/path/to/providers.yml"
+    filename: "providers.yml"
 ```
 
 and `providers.yml`
@@ -262,7 +265,7 @@ http:
   middlewares:
     example:
       luascript:
-        script: /path/to/example.lua
+        script: example.lua
 
   services:
     service1:
@@ -284,13 +287,13 @@ traefik.setResponseHeader('X-New-Response-Header', 'Woohoo')
 Run the traefik
 
 ```bash
-./traefik --configFile=config.yml
+./dist/traefik --configFile=config.yml
 ```
 
 Call the traefik (from another terminal)
 
 ```bash
-curl -v http://localhost
+curl -v http://localhost:8080
 ```
 
 And, as result, we see a traefik log
